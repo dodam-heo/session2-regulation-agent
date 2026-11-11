@@ -45,7 +45,7 @@ test('공식 원문의 조문·부칙·별표와 원문 해시를 보존한다',
  assert.match(r.text,/제1조\(목적\)/);
  assert.match(r.text,/별표 1/);
  assert.match(r.text,/부칙/);
- assert.equal(r.sha256.length,64);
+ assert.equal(r.hash.length,64);
  assert.equal(r.verifiedFromApi,true);
 });
 test('공식 API 인증값 없이는 검색 요청 자체를 보내지 않는다',async()=>{
