@@ -35,7 +35,7 @@ function normalizeList(response,target){
    const name=get(obj,meta.name),serial=get(obj,meta.serial),id=get(obj,meta.id);
    if(!name||!(serial||id))continue;
    const key=target+':'+(serial||id);
-   const item={key,target,name,serial,id,issued:get(obj,meta.issued),
+   const item={key,target,name,serial,id,versionState:get(obj,['현행연혁코드','현행연혁구분','현행여부']),issued:get(obj,meta.issued),
      effective:get(obj,meta.effective),kind:get(obj,meta.kind),issuer:get(obj,meta.issuer),
      url:officialLink(get(obj,meta.link)),status:'조회 목록(원문 미확인)'};
    if(!found.has(key))found.set(key,item);
@@ -91,8 +91,9 @@ async function search({oc,target='law',query='',history=false,page=1}){
  assertTarget(target);
  const phrase=String(query).trim();
  if(!phrase||phrase.length>120)throw Error('법령·규정명을 120자 이내로 입력해 주세요.');
- const q={OC:checkOC(oc),target,type:'JSON',query:phrase,display:30,page,sort:'ddes'};
- if(target!=='law')q.nw=history?'2':'1';
+ const q={OC:checkOC(oc),target:target==='law'&&history?'eflaw':target,type:'JSON',query:phrase,display:30,page,sort:'ddes'};
+ if(target==='law'&&history)q.nw='1,2,3';
+ else if(target!=='law')q.nw=history?'2':'1';
  const json=await request(urlFor('lawSearch.do',q));
  return {items:normalizeList(json,target),total:Number(json?.totalCnt||json?.law?.totalCnt||json?.admrul?.totalCnt||0),query:phrase,target,history};
 }
