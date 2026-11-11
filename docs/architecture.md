@@ -21,3 +21,11 @@ GitHub Pages는 `dist/index.html`과 `dist/src`만 공개. API 서버와 비밀�
 
 ## 후속
 근거 원문 출처/판본/해시, 근거 인용검증, 조문 내부 식별자, 의미 대응 검증, 제·개정문 컴파일러, 문서 템플릿, 권한/감사 체계를 순차 추가한다.
+
+
+## GitHub Pages AI 호출 경로
+
+- 기본 경로: 요청·원문 전송 동의 시에만 동적으로 Puter.js를 불러와 `puter.ai.chat(..., {model, normalize:true})` 호출. Puter 계정 로그인/이용 요금이 필요할 수 있고, 외부 서비스로 전송되는 데이터는 사용자가 확인해야 한다.
+- 대체 경로: 사용자가 지정한 HTTPS 서버 `/api/assist`. LLM 비밀 키는 서버에만 존재하며 브라우저에서는 서버 접근용 일시 입력 토큰만 사용한다. 원격 서버는 `AI_ALLOWED_ORIGINS` CORS 허용 목록과 `AI_ACCESS_TOKEN` 인증을 적용한다.
+- 응답 계약: `proposalText`, `reason`, `warnings`; 내용/크기 검증 및 초안 버전 확인 후 **명시적 승인** 시에만 본문 변경.
+- Puter와 자체 서버는 동일 응답 계약으로 호출되어 제공자 교체가 가능하다. 법령판본 검증 및 외부 검색은 별도 기능이며 AI가 확인했다고 주장하지 않는다.
