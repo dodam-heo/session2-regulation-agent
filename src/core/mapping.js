@@ -6,7 +6,7 @@ function body(text){
   .replace(/\s+/g,'').replace(/[〈〉"“”‘’.,:;()]/g,'');
 }
 function dice(a,b){
- a=body(a);b=body(b);if(!a||!b)return 0;if(a===b)return 1;
+ a=body(a);b=body(b);if(!a||!b)return 0;if(a===b)return a.length>=10?1:0;
  if(a.length<10||b.length<10)return 0;
  const grams=s=>{const r=new Map();for(let i=0;i<s.length-1;i++){const v=s.slice(i,i+2);r.set(v,(r.get(v)||0)+1);}return r;};
  const A=grams(a),B=grams(b);let overlap=0,totalA=0,totalB=0;
