@@ -1,34 +1,86 @@
-name: Session 2 checks and GitHub Pages
+name: Session 2 · Verify and deploy to GitHub Pages
+
 on:
   push:
-    branches: [main]
+    branches:
+      - main
   workflow_dispatch:
+
 permissions:
   contents: read
   pages: write
   id-token: write
+
 concurrency:
-  group: pages
+  group: session2-github-pages
   cancel-in-progress: true
+
 jobs:
-  build-and-deploy:
+  build:
+    name: Test and build static site
     runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Test source and syntax
+        run: npm run check
+
+      - name: Create static site
+        run: npm run build
+
+      - name: Verify deployable output
+        shell: bash
+        run: |
+          test -s dist/index.html
+          test -s dist/src/main.js
+          test -s dist/src/styles.css
+          test -s dist/src/core/parser.js
+          echo "Static site output verified"
+          find dist -maxdepth 3 -type f | sort
+
+      - name: Upload static site
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+
+  deploy:
+    name: Deploy verified site
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - name: Validate source and run tests
-        run: npm run check
-      - name: Build standalone static site
-        run: npm run build
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
-      - name: Deploy to Pages
+      - name: Verify GitHub Pages is enabled for GitHub Actions
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          http_code=$(curl --silent --show-error --location \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header "Accept: application/vnd.github+json" \
+            --output /tmp/session2-pages.json \
+            --write-out "%{http_code}" \
+            "https://api.github.com/repos/${GITHUB_REPOSITORY}/pages")
+          if [[ "${http_code}" != "200" ]]; then
+            echo "::error::GitHub Pages is not enabled or accessible (HTTP ${http_code}). Open Settings > Pages > Build and deployment and select Source: GitHub Actions, then re-run this workflow."
+            exit 1
+          fi
+          echo "GitHub Pages site exists"
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
