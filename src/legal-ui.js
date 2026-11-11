@@ -29,7 +29,7 @@ function view(state,e){
    option('law','법률·시행령·시행규칙')+
    option('admrul','행정규칙 · 훈령/예규/고시/지침')+
    option('ordin','자치법규')+'</select></label>'+
-   '<label>공식 API OC 인증값<input name="oc" type="password" autocomplete="off" required placeholder="발급받은 인증값" /></label></div>'+
+   '<div class="privacy-note">공식 API OC 기본값 <strong>dori</strong> 자동 적용</div></div>'+
    '<label>법령·규정명<input name="query" maxlength="120" required value="'+e(x.query||'')+'" placeholder="규정명을 검색" /></label>'+
    '<label class="consent"><input type="checkbox" name="history" /> 과거 판본 포함 (행정규칙·자치법규)</label>'+
    '<button type="submit" class="btn btn-primary"'+(x.loading?' disabled':'')+'>'+(x.loading?'공식 원문 조회 중…':'공식 원문 조회 →')+'</button></form>'+
