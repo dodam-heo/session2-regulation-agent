@@ -4,6 +4,8 @@ on:
   push:
     paths:
       - 'scripts/verify-live-law-api.cjs'
+      - 'scripts/verify-live-client.cjs'
+      - 'src/law-drf.js'
       - '.github/workflows/verify-law-api.yml'
   workflow_dispatch:
 
@@ -22,3 +24,5 @@ jobs:
           node-version: '22'
       - name: Verify real law search, full text and browser CORS
         run: node scripts/verify-live-law-api.cjs
+      - name: Verify actual deployed-browser client with no Puter
+        run: node scripts/verify-live-client.cjs
