@@ -1,60 +1,63 @@
 'use strict';
 const test=require('node:test');
 const assert=require('node:assert/strict');
+const vm=require('node:vm');
 const fs=require('node:fs');
 const path=require('node:path');
-const vm=require('node:vm');
-const src=fs.readFileSync(path.join(__dirname,'..','src','ai-client.js'),'utf8');
-function setup(response){
-  const calls=[];let sdkLoads=0;
-  const window={
-    location:{protocol:'https:'},
-    document:{head:{appendChild(script){sdkLoads++;window.puter={ai:{chat:async(...args)=>{calls.push(args);return response;}}};script.onload();}},createElement(){return {};}}
-  };
-  vm.runInNewContext(src,{window,fetch:()=>{},URL,AbortSignal},{filename:'ai-client.js'});
-  return {api:window.RegulationAI,calls,get sdkLoads(){return sdkLoads}};
+const js=fs.readFileSync(path.join(__dirname,'../src/ai-client.js'),'utf8');
+const example={operation:'amend',instruction:'제1조만 정리해 줘',baseText:'제1조(목적) 기존 조문',
+  draftText:'제1조(목적) 기존 조문',sources:[]};
+function browser(options={}){
+  let calls=[];
+  const window={location:{origin:options.origin||'https://dodam-heo.github.io',
+    hostname:options.hostname||'dodam-heo.github.io'}};
+  const ctx={window,URL,AbortSignal,fetch:async(url,opts)=>{
+    calls.push({url,opts});
+    return {ok:options.status===undefined?true:options.status===200,status:options.status||200,
+      json:async()=>options.body||{proposalText:'제1조(목적) 수정',reason:'조문 명료화',warnings:['위임 확인'],provider:'gemini',model:'gemini-flash-latest'}};
+  }};
+  vm.runInNewContext(js,ctx,{filename:'ai-client.js'});
+  return {api:window.RegulationAI,calls};
 }
-const payload={operation:'amend',title:'가상 규정',regulationType:'내부 지침',instruction:'제1조 수정',
-  baseText:'제1조(목적) 원문',draftText:'제1조(목적) 원문',sources:[]};
-test('동의 전에는 SDK를 실행·연결하지 않는다',()=>{
-  const x=setup({});
-  assert.equal(x.sdkLoads,0);
-  assert.equal(typeof x.api.generatePuter,'function');
+test('Puter 및 외부 SDK를 호출하는 코드가 전혀 없다',()=>{
+  assert.equal(/puter|js\.puter\.com|generatePuter/i.test(js),false);
+  assert.equal(typeof browser().api.generateServer,'function');
 });
-test('Puter 모델 선택과 규정 원문 전달',async()=>{
-  const x=setup({message:{content:JSON.stringify({proposalText:'제1조(목적) 수정됨',reason:'요청',warnings:['확인 필요']})}});
-  const result=await x.api.generatePuter(payload,'gpt-5.4-nano');
-  assert.equal(x.sdkLoads,1);
-  assert.equal(x.calls.length,1);
-  assert.equal(x.calls[0][1].model,'gpt-5.4-nano');
-  assert.equal(x.calls[0][1].normalize,true);
-  assert.match(x.calls[0][0],/제1조\(목적\) 원문/);
-  assert.equal(result.proposalText,'제1조(목적) 수정됨');
+test('GitHub Pages는 AI 서버가 없을 때 가짜 호출을 하지 않는다',async()=>{
+  const b=browser();
+  await assert.rejects(()=>b.api.generateServer(example),/AI 서버 주소/);
+  assert.equal(b.calls.length,0);
+});
+test('Gemini 공급자는 서버에서 처리하며 클라이언트 API는 범용이다',async()=>{
+  const b=browser();
+  const result=await b.api.generateServer(example,'https://gemini-backend.example','temporary-token');
+  assert.equal(b.calls[0].url,'https://gemini-backend.example/api/assist');
+  assert.equal(b.calls[0].opts.headers.Authorization,'Bearer temporary-token');
+  assert.equal(b.calls[0].opts.credentials,'omit');
+  assert.equal(JSON.parse(b.calls[0].opts.body).instruction,example.instruction);
+  assert.equal(result.provider,'gemini');
+  assert.equal(result.model,'gemini-flash-latest');
   assert.equal(result.verified,false);
-  assert.deepEqual(Array.from(result.warnings),['확인 필요']);
+  assert.equal(result.proposalText,'제1조(목적) 수정');
 });
-test('JSON 마크다운 코드블록을 정규화하고 텍스트를 검증한다',()=>{
-  const x=setup({});
-  const res=x.api.parseProposal({message:{content:'\x60\x60\x60json\n{"proposalText":"제1조(목적) 수정"}\n\x60\x60\x60'}});
-  assert.equal(res.proposalText,'제1조(목적) 수정');
-  assert.throws(()=>x.api.parseProposal({message:{content:'설명만 있음'}}),/JSON/);
-  assert.throws(()=>x.api.parseProposal({message:{content:'{"reason":"없음"}'}}),/규정 전문/);
+test('서버 요청 주소의 사용자 정보나 HTTP는 차단한다',()=>{
+  const b=browser();
+  assert.equal(b.api.makeAssistUrl('https://backend.example/api/assist'),'https://backend.example/api/assist');
+  assert.throws(()=>b.api.makeAssistUrl('http://backend.example'),/HTTPS/);
+  assert.throws(()=>b.api.makeAssistUrl('https://user:password@backend.example'),/사용자정보/);
 });
-test('비공개 근거 전송을 차단한다',async()=>{
-  const x=setup({});
-  await assert.rejects(()=>x.api.generatePuter({...payload,sources:[{private:true,title:'비공개'}]}),/비공개/);
-  assert.equal(x.sdkLoads,0);
+test('개인용 서버에서는 같은 오리진으로 호출할 수 있다',()=>{
+  const b=browser({origin:'http://localhost:3000',hostname:'localhost'});
+  assert.equal(b.api.makeAssistUrl(''),'http://localhost:3000/api/assist');
 });
-test('외부 서버 URL은 HTTPS를 강제한다',()=>{
-  const x=setup({});
-  assert.equal(x.api.makeAssistUrl('https://example.org/'),'https://example.org/api/assist');
-  assert.equal(x.api.makeAssistUrl('https://example.org/api/assist'),'https://example.org/api/assist');
-  assert.equal(x.api.makeAssistUrl('http://localhost:3000'),'http://localhost:3000/api/assist');
-  assert.throws(()=>x.api.makeAssistUrl('http://example.org'),/HTTPS/);
-  assert.throws(()=>x.api.makeAssistUrl('https://user:pass@example.org'),/인증정보/);
+test('비공개 근거가 외부로 전송되지 않도록 차단한다',async()=>{
+  const b=browser();
+  await assert.rejects(()=>b.api.generateServer({...example,sources:[{private:true}]},'https://backend.example'),/비공개/);
+  assert.equal(b.calls.length,0);
 });
-test('모델 ID를 임의 HTML/URL 문자열로 바꿀 수 없다',async()=>{
-  const x=setup({});
-  await assert.rejects(()=>x.api.generatePuter(payload,'<script>'),/모델 ID/);
-  assert.equal(x.sdkLoads,0);
+test('잘못된 AI 반환 형식과 서버 오류는 성공으로 취급하지 않는다',async()=>{
+  const b=browser({body:{reason:'no proposal'}});
+  await assert.rejects(()=>b.api.generateServer(example,'https://backend.example'),/유효한 규정 초안/);
+  const failed=browser({status:503,body:{error:'AI 서버 설정 필요'}});
+  await assert.rejects(()=>failed.api.generateServer(example,'https://backend.example'),/AI 서버 설정 필요/);
 });

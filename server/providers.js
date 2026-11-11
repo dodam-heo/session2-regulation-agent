@@ -1,7 +1,13 @@
 'use strict';
 const MAX_OUTPUT=50000;
 function config(env=process.env){
-  return {provider:env.LLM_PROVIDER||'compatible',url:env.LLM_API_URL||'',key:env.LLM_API_KEY||'',model:env.LLM_MODEL||'',timeout:Math.min(90000,Math.max(3000,Number(env.LLM_TIMEOUT_MS||45000)))};
+  // Gemini is the deployment default, but the public request/response contract
+  // and the workbench do not depend on any model or provider.
+  const provider=env.LLM_PROVIDER||'gemini';
+  return {provider,url:env.LLM_API_URL||'',
+    key:provider==='gemini'?(env.GEMINI_API_KEY||env.LLM_API_KEY||''):(env.LLM_API_KEY||''),
+    model:env.LLM_MODEL||(provider==='gemini'?'gemini-flash-latest':''),
+    timeout:Math.min(90000,Math.max(3000,Number(env.LLM_TIMEOUT_MS||45000)))};
 }
 function isConfigured(env=process.env) {
   const c=config(env);
@@ -52,6 +58,6 @@ async function generateProposal(payload,env=process.env){
   if(!response.ok)throw Object.assign(new Error('AI 공급자 응답 오류: HTTP '+response.status),{code:502});
   const data=await response.json();const output=request.extract(data);
   if(typeof output!=='string')throw new Error('AI 응답 형식이 예상과 다릅니다.');
-  return parseProposal(output);
+  return {...parseProposal(output),provider:c.provider,model:c.model};
 }
 module.exports={config,isConfigured,generateProposal};
