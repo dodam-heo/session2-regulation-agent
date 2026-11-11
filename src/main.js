@@ -59,7 +59,7 @@ function overviewView(work){const counts=compareRegulations(work.baseText,work.d
 <button type="button" class="btn btn-minor" data-action="check-ai-connection">AI 서버 연결 확인</button>
 <p class="hint">Cloudflare Worker에 Gemini 중계 코드를 배포하면 바로 사용할 수 있습니다. 공식 법령 검색은 AI 서버 없이 작동합니다. 여러 방문자의 AI 사용량은 운영자가 관리합니다.</p>
 </div>
-<label>요청 내용<textarea name="instruction" rows="4" placeholder="예: 제3조의 문구를 명확하게 수정하고 근거가 부족한 부분은 별도로 표시해줘">${e(work.objective)}</textarea></label><label class="consent"><input type="checkbox" name="consent" required /> 현재 작업 원문을 구성된 AI 서버로 전송하는 데 동의합니다.</label><button class="btn btn-primary full" ${aiWorking?'disabled':''} type="submit">${aiWorking?'AI 제안 생성 중…':'AI 초안 제안 요청 →'}</button></form><div class="hint">AI 제안은 검증 전 초안으로, 담당자가 승인하기 전에는 규정 본문에 반영되지 않습니다.</div>${aiMessage?`<div class="message">${e(aiMessage)}</div>`:''}${work.aiSuggestion?`<div class="proposal"><strong>AI 제안 · 적용 전 검토</strong><pre>${e(work.aiSuggestion.proposalText||'내용 없음')}</pre>${work.aiSuggestion.reason?`<p>${e(work.aiSuggestion.reason)}</p>`:''}${work.aiSuggestion.warnings?.length?'<div class="notice amber-notice"><strong>AI 검토 필요 사항</strong><ul>'+work.aiSuggestion.warnings.map(x=>'<li>'+e(x)+'</li>').join('')+'</ul></div>':''}<div class="button-row"><button class="btn btn-primary" data-action="apply-ai">이 제안으로 초안 교체</button><button class="btn btn-minor" data-action="reject-ai">제안 닫기</button></div></div>`:''}</section>${revisionPanel(work)}<section class="panel activity-panel">${sectionTop('최근 변경 이력','초안 변경 시 비교·검토는 최신 자료에서 다시 계산합니다.')}<div class="activity-list">${[...work.history].reverse().slice(0,9).map(x=>`<div><span class="history-dot"></span><span><strong>${e(x.what)}</strong><small>${formatDate(x.at)}</small></span></div>`).join('')}</div></section></div>`;}
+<label>요청 내용<textarea name="instruction" rows="4" placeholder="예: 제3조의 문구를 명확하게 수정하고 근거가 부족한 부분은 별도로 표시해줘">${e(work.aiInstruction||'')}</textarea></label><label class="consent"><input type="checkbox" name="consent" required /> 현재 작업 원문을 구성된 AI 서버로 전송하는 데 동의합니다.</label><button class="btn btn-primary full" ${aiWorking?'disabled':''} type="submit">${aiWorking?'AI 제안 생성 중…':'AI 초안 제안 요청 →'}</button></form><div class="hint">AI 제안은 검증 전 초안으로, 담당자가 승인하기 전에는 규정 본문에 반영되지 않습니다.</div>${aiMessage?`<div class="message">${e(aiMessage)}</div>`:''}${work.aiSuggestion?`<div class="proposal"><strong>AI 제안 · 적용 전 검토</strong><pre>${e(work.aiSuggestion.proposalText||'내용 없음')}</pre>${work.aiSuggestion.reason?`<p>${e(work.aiSuggestion.reason)}</p>`:''}${work.aiSuggestion.warnings?.length?'<div class="notice amber-notice"><strong>AI 검토 필요 사항</strong><ul>'+work.aiSuggestion.warnings.map(x=>'<li>'+e(x)+'</li>').join('')+'</ul></div>':''}<div class="button-row"><button class="btn btn-primary" data-action="apply-ai">이 제안으로 초안 교체</button><button class="btn btn-minor" data-action="reject-ai">제안 닫기</button></div></div>`:''}</section>${revisionPanel(work)}<section class="panel activity-panel">${sectionTop('최근 변경 이력','초안 변경 시 비교·검토는 최신 자료에서 다시 계산합니다.')}<div class="activity-list">${[...work.history].reverse().slice(0,9).map(x=>`<div><span class="history-dot"></span><span><strong>${e(x.what)}</strong><small>${formatDate(x.at)}</small></span></div>`).join('')}</div></section></div>`;}
 function safeExternalUrl(raw){
  try{const u=new URL(String(raw||''));return ['https:','http:'].includes(u.protocol)?u.href:'';}catch{return '';}
 }
@@ -216,6 +216,13 @@ document.addEventListener('change',async ev=>{
   }
   if(input.matches('[data-action="stage"]')){const work=w();if(!work)return;const taskStates={...work.taskStates,[input.dataset.stage]:input.checked};editWork({taskStates},'절차 체크리스트 변경');}
 });
+// Keep the request separate from the work objective and preserve it across renders.
+root.addEventListener('input',event=>{
+  if(!event.target.matches('#aiForm [name="instruction"]'))return;
+  const work=w();if(!work)return;
+  work.aiInstruction=event.target.value;
+  saveCases(cases);
+});
 document.addEventListener('submit',async event=>{
   const form=event.target;if(!form.id)return;event.preventDefault();const d=new FormData(form),val=k=>String(d.get(k)||'').trim();
   if(form.id==='quickForm'){modal={type:'amend',intent:val('intent')};render();return;}
@@ -251,6 +258,8 @@ document.addEventListener('submit',async event=>{
     aiServerUrl=val('aiServerUrl');
     const serverToken=val('aiServerToken');
     const instruction=val('instruction');
+    work.aiInstruction=String(d.get('instruction')||'');
+    saveCases(cases);
     if(!instruction){notify('AI 작성 요청을 입력해 주세요.');return;}
     const request={
       operation:work.type==='enact'?'enact':work.type==='review'?'review':'amend',
