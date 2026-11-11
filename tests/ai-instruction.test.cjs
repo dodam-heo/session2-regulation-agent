@@ -1,0 +1,24 @@
+'use strict';
+const test=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const vm=require('node:vm');
+test('AI 요청은 업무 목적과 분리되고 입력·재표시·저장 후에도 유지된다',()=>{
+  const listeners={};let saved;
+  const work={id:'test',objective:'예시 업무 목적',baseText:'',draftText:'',sources:[],history:[],draftVersion:1};
+  const root={addEventListener:(name,fn)=>listeners[name]=fn};
+  const context=vm.createContext({escapeHtml:s=>String(s??''),loadCases:()=>[work],saveCases:x=>(saved=JSON.parse(JSON.stringify(x)),true),document:{querySelector:()=>root,addEventListener:()=>{}},compareRegulations:()=>[],WORK_TYPES:{}});
+  const source=fs.readFileSync('src/main.js','utf8').replace(/render\(\);\s*$/,'');
+  vm.runInContext(source,context);
+  vm.runInContext("activeId='test'; revisionPanel=()=>'';",context);
+  const value=()=>vm.runInContext('overviewView(w())',context).match(/<textarea name="instruction"[^>]*>([\s\S]*?)<\/textarea>/)[1];
+  assert.equal(value(),'');
+  const request='제2조만 변경하고 제1조와 제3조는 유지해 줘.';
+  listeners.input({target:{matches:()=>true,value:request}});
+  assert.equal(value(),request);
+  assert.equal(value(),request);
+  assert.equal(saved[0].aiInstruction,request);
+  assert.equal(work.objective,'예시 업무 목적');
+  listeners.input({target:{matches:()=>true,value:''}});
+  assert.equal(value(),'');
+});
