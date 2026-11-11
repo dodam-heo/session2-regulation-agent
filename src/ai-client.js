@@ -69,5 +69,5 @@
    if(!body.proposalText)throw new Error('AI 서버의 초안 전문이 비어 있습니다.');
    return {...parseProposal(JSON.stringify(body)),provider:'server',model:'server'};
  }
- global.RegulationAI={generatePuter,generateServer,parseProposal,makeAssistUrl,prompt};
+ global.RegulationAI={generatePuter,generateServer,parseProposal,makeAssistUrl,prompt,ensurePuter:loadPuter};
 })(window);
