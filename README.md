@@ -42,6 +42,14 @@ GitHub의 **Settings → Pages → Build and deployment → GitHub Actions**를 
 
 화면의 **업무 개요 → AI 초안 작성 보조**에서 HTTPS AI 서버 주소와 (사용 시) 서버 접근 토큰을 입력합니다. 전송 동의 버튼을 눌렀을 때만 해당 서버에 규정 자료가 전달됩니다. AI 결과는 검토용 제안이며 수동 승인 전에는 초안을 변경하지 않습니다.
 
+### 즉시 사용: Cloudflare Worker Gemini 연동
+
+**Cloudflare Worker `session2-regulation-ai`에서 `GEMINI_API_KEY`를 Secret으로 등록한 경우**, [Cloudflare Worker 1회 코드 배포 안내](docs/cloudflare-worker.md)에 따라 `cloudflare/worker.js`를 Worker의 **Edit code → Deploy**로 배포하세요.
+
+사이트의 AI 주소는 이미 `https://session2-regulation-ai.dodam6002.workers.dev`로 설정되어 있어 심사위원이 별도 API 키·접근 토큰을 입력하지 않습니다. **Worker를 직접 배포하기 전에는 실제 Gemini 생성이 아직 동작하지 않습니다.**
+
+Cloudflare Worker는 기본적인 브라우저 출처 검사와 인스턴스별 간이 요청 제한을 제공합니다. 전역 비용 보호는 별도 쿼터·인증·Cloudflare 제한 설정이 필요합니다.
+
 ### AI 백엔드 — Gemini 기본, LLM 교체 가능
 
 다음 값들을 `.env` 파일에 두고 개인 서버에서 실행합니다. **실제 `.env`를 Git에 추가하지 마세요.**
