@@ -9,7 +9,7 @@
 - **편집·비교:** 원문 보존, 조문 단위 수정·삭제·신설, 신구조문 대조, 수정 어구 강조
 - **오류 점검:** 내부 인용, 항 번호 이동 후보, 조문 구조, 이유서 수치 불일치 탐지
 - **문서:** 텍스트/HTML/작업 JSON 내보내기, 단계별 체크리스트
-- **AI 확장:** 별도 Node 서버에서 OpenAI 호환·Gemini·Anthropic API 중 선택 (환경변수 및 명시적 전송동의 필요)
+- **AI 제안:** GitHub Pages의 Puter 계정 사용 모드(GPT·Gemini·Claude 등) 또는 보안 Node 서버(OpenAI 호환·Gemini·Anthropic) 선택. 외부 전송동의와 담당자 승인 필수
 
 가상 예제는 **데모 자료이며 법적 근거의 유효성을 입증하는 사례가 아닙니다.**
 
@@ -30,13 +30,17 @@ npm start
 
 GitHub의 **Settings → Pages → Build and deployment → GitHub Actions**를 선택합니다. `main`에 push되면 `.github/workflows/ci-pages.yml`이 테스트하고 `dist/`를 배포합니다.
 
-**정적 Pages에서 AI 서버는 실행되지 않습니다.** 이 배포는 규정 편집·비교·검토 등 클라이언트 기능용입니다. 별도 서버와 같은 오리진의 `/api/assist`가 연결되어야 AI 요청이 작동합니다.
+**GitHub Pages에서도 AI 제안을 요청할 수 있습니다.** 작업 개요의 **AI 연결 방식 → Puter 계정으로 사용**을 선택하면 브라우저에서 SDK를 필요할 때만 불러옵니다. Puter 계정 로그인이 필요하며 사용자 계정의 사용량에 따라 비용이 발생할 수 있습니다. GPT·Gemini·Claude 등 사용 가능한 모델 ID를 지정할 수 있고, 모델 접근 권한·요금은 Puter 정책에 따릅니다. 내 규정 원문은 요청 버튼과 외부 전송 동의를 누른 경우에만 전송되며, 결과는 승인 전까지 초안에 덮어쓰지 않습니다. 데이터는 제3자 서비스로 전송되므로 내부·비공개 문서는 기관 보안 정책 확인 없이 입력하면 안 됩니다.
+
+**자체 서버 연결 모드**도 제공됩니다. 사용자가 운영하는 HTTPS API 서버 주소와 접근 토큰을 입력해야 하며 정적 Pages 자체에는 비밀키를 저장하지 않습니다. 이 저장소를 배포하기만 해서는 자체 서버가 자동 구축되는 것은 아닙니다.
 
 ### AI 서버
 
 환경변수 `LLM_PROVIDER` (`compatible` / `gemini` / `anthropic`), `LLM_MODEL`, `LLM_API_KEY`, 필요 시 `LLM_API_URL`을 **개인 서버**에만 넣고 `npm start`를 실행하세요. `.env.example` 참고.
 
-브라우저에 API 키를 넣지 않으며 GitHub Actions Variables나 Pages 정적 파일에 비밀키를 공개해서도 안 됩니다. AI 초안은 사용자 검토 전 자동 확정되지 않습니다.
+외부 공개 서버에 배포할 경우 필수로 `HOST=0.0.0.0`, `AI_ACCESS_TOKEN=충분히 긴 임의 토큰`, `AI_ALLOWED_ORIGINS=https://dodam-heo.github.io`를 서버의 비밀 환경변수에 설정합니다. 모델 키(`LLM_API_KEY`)와 접근 토큰은 **서버 측 비밀 환경변수**로만 관리하세요. 브라우저, GitHub Pages, Actions의 소스 코드/로그에 넣지 마세요. API 서버는 HTTPS(보안 리버스 프록시 포함)로 연결하고, 누구나 사용할 수 있는 공개 비용부담 API로 열어두지 마세요.
+
+AI 생성 결과는 제·개정 **검토용 제안**일 뿐이며, 원문·근거·인용·절차를 자동 검증했다고 표시하지 않습니다. 별도 서버가 없어도 Puter 모드 또는 수동 기능을 선택할 수 있습니다.
 
 ## 현재 한계
 
