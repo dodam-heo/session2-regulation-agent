@@ -13,8 +13,8 @@ permissions:
   contents: read
 
 jobs:
-  live-law-api:
-    name: Real OC=dori search and full-text verification
+  direct-client:
+    name: Native browser client and CORS verification (no Puter)
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
@@ -22,7 +22,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Verify real law search, full text and browser CORS
-        run: node scripts/verify-live-law-api.cjs
-      - name: Verify actual deployed-browser client with no Puter
+      - name: Search, retrieve original clauses and verify browser GET CORS
         run: node scripts/verify-live-client.cjs
+
+  raw-api:
+    name: Raw official API diagnostic (independent)
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Search and retrieve raw official JSON
+        run: node scripts/verify-live-law-api.cjs
