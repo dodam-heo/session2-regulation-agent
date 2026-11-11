@@ -1,0 +1,24 @@
+name: Live government law API verification
+
+on:
+  push:
+    paths:
+      - 'scripts/verify-live-law-api.cjs'
+      - '.github/workflows/verify-law-api.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live-law-api:
+    name: Real OC=dori search and full-text verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify real law search, full text and browser CORS
+        run: node scripts/verify-live-law-api.cjs
