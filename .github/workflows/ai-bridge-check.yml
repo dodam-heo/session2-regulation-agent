@@ -46,3 +46,19 @@ jobs:
           cat headers.txt
           grep -qi '^HTTP/.* 204' headers.txt || { echo "::error::Worker OPTIONS preflight failed."; exit 1; }
           grep -qi '^Access-Control-Allow-Origin: https://dodam-heo.github.io' headers.txt || { echo "::error::Worker CORS is incorrect."; exit 1; }
+
+      - name: Try one minimal real Gemini generation
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > request.json <<'JSON'
+          {"operation":"amend","title":"연결 검증용 가상 규정","regulationType":"기타","instruction":"제1조를 간결하게 고치고 규정 전문을 반환해 줘.","baseText":"제1조(목적) 이 규정은 업무의 처리를 위하여 필요한 사항을 정한다.","draftText":"제1조(목적) 이 규정은 업무의 처리를 위하여 필요한 사항을 정한다.","sources":[]}
+          JSON
+          status=$(curl -sS -m 90 -o response.json -w '%{http_code}' \
+            -X POST -H "Origin: https://dodam-heo.github.io" \
+            -H "Content-Type: application/json" --data-binary @request.json \
+            "https://session2-regulation-ai.dodam6002.workers.dev/api/assist")
+          echo "Gemini generation HTTP: $status"
+          jq -c '{error:(.error // null),provider:(.provider // null),model:(.model // null),proposalReceived:(.proposalText | type=="string" and length>0)}' response.json
+          [[ "$status" == "200" ]] || { echo "::error::Gemini generation returned HTTP $status"; exit 1; }
+          jq -e '.proposalText | type == "string" and length > 0' response.json >/dev/null
