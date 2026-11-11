@@ -14,3 +14,16 @@ test('AI 비밀키가 없으면 서버에서 미연결 상태로 처리한다',(
   assert.equal(isConfigured({LLM_PROVIDER:'compatible',LLM_MODEL:'test',LLM_API_KEY:'x',LLM_API_URL:''}),false);
   assert.equal(config({LLM_PROVIDER:'anthropic',LLM_MODEL:'model',LLM_API_KEY:'x'}).provider,'anthropic');
 });
+
+const {allowOrigin,authorized}=require('../server/index.js');
+test('별도 AI 서버의 접근 토큰을 검증한다',()=>{
+  assert.equal(authorized({headers:{authorization:'Bearer secret-token'}},'secret-token'),true);
+  assert.equal(authorized({headers:{authorization:'Bearer wrong'}},'secret-token'),false);
+  assert.equal(authorized({headers:{}},'secret-token'),false);
+});
+test('허용되지 않은 외부 Origin은 차단하고 자체 도메인은 허용한다',()=>{
+  const headers={};const res={setHeader:(k,v)=>{headers[k]=v;}};
+  assert.equal(allowOrigin({headers:{origin:'https://malicious.example',host:'example.org'}},res),false);
+  assert.equal(allowOrigin({headers:{origin:'https://example.org',host:'example.org'}},res),true);
+  assert.equal(headers['Access-Control-Allow-Origin'],'https://example.org');
+});
