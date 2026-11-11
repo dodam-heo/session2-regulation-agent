@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - main
+      - 'feat/complete-session2-workflow-*'
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
@@ -40,6 +44,10 @@ jobs:
           test -s dist/index.html
           test -s dist/src/main.js
           test -s dist/src/ai-client.js
+          test -s dist/src/law-drf.js
+          test -s dist/src/legal-ui.js
+          test -s dist/src/docx-export.js
+          test -s dist/src/core/mapping.js
           test -s dist/src/styles.css
           test -s dist/src/core/parser.js
           echo "Static site output verified"
@@ -51,6 +59,7 @@ jobs:
           path: dist
 
   deploy:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     name: Deploy verified site
     needs: build
     runs-on: ubuntu-latest
