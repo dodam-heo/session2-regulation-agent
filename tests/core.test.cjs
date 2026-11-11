@@ -15,16 +15,16 @@ function evaluate(expression) {
   return vm.runInContext(expression,context);
 }
 test('조문과 부칙 동명 조문을 구별한다',()=>{
-  assert.deepEqual(Array.from(evaluate('parseRegulation("제1조(목적) 내용\n부칙\n제1조(시행일) 다음 날").map(b=>b.kind)')),['article','addendum','addendumArticle']);
+  assert.deepEqual(Array.from(evaluate('parseRegulation("제1조(목적) 내용\\n부칙\\n제1조(시행일) 다음 날").map(b=>b.kind)')),['article','addendum','addendumArticle']);
 });
 test('변경·유지·신설·삭제를 계산한다',()=>{
-  assert.deepEqual(Array.from(evaluate('compareRegulations("제1조(목적) A\n제2조(사항) B", "제1조(목적) A\n제3조(신설) C").map(r=>r.status)')),['유지','삭제','신설']);
+  assert.deepEqual(Array.from(evaluate('compareRegulations("제1조(목적) A\\n제2조(사항) B", "제1조(목적) A\\n제3조(신설) C").map(r=>r.status)')),['유지','삭제','신설']);
 });
 test('신규 제정은 일부개정문으로 표시하지 않는다',()=>{
   assert.match(evaluate('compileAmendment("새 규정",compareRegulations("","제1조(목적) 내용"),"","enact")'),/제정안/);
 });
 test('다른 의무 조항의 기한을 임의 변경하지 않는다',()=>{
-  const rows=evaluate('compareRegulations("제1조(신청) 30일 이내 제출\n제2조(통지) 30일 이내 통지","제1조(신청) 20일 이내 제출\n제2조(통지) 30일 이내 통지")');
+  const rows=evaluate('compareRegulations("제1조(신청) 30일 이내 제출\\n제2조(통지) 30일 이내 통지","제1조(신청) 20일 이내 제출\\n제2조(통지) 30일 이내 통지")');
   assert.equal(rows[0].status,'수정');
   assert.equal(rows[1].status,'유지');
 });
