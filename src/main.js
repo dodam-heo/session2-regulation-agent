@@ -2,7 +2,7 @@ const e=escapeHtml;
 
 let cases=loadCases();let activeId=null,tab='overview',modal=null,filter='all',aiWorking=false,aiMessage='';
 let aiMode='puter',aiModel='gpt-5.4-nano',aiServerUrl='',aiServerToken='';
-let lawOc='',lawSearch={items:[],query:'',target:'law',loading:false,error:'',selected:null};
+let lawOc='dori',lawSearch={items:[],query:'',target:'law',loading:false,error:'',selected:null};
 const root=document.querySelector('#app');
 const tabs=[['overview','업무 개요'],['sources','근거·자료'],['draft','조문 편집'],['compare','신구 대비'],['review','오류·영향'],['documents','문서·절차']];
 const features=[
@@ -198,7 +198,7 @@ document.addEventListener('submit',async event=>{
   if(form.id==='objectiveForm'){editWork({objective:val('objective')},'업무 목적 수정');notify('업무 목적을 저장했습니다.');return;}
   if(form.id==='baseForm'){const next=changeBase(work,val('baseText'),val('baseVersion'));setWork(next);notify('현행판본을 저장했습니다. 이전 검토 기록은 무효화했습니다.');return;}
   if(form.id==='officialSearchForm'){
-    lawOc=val('oc');
+    lawOc='dori';
     lawSearch={items:[],query:val('query'),target:val('target'),loading:true,error:'',selected:null};
     render();
     try{
