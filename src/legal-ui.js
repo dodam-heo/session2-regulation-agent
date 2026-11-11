@@ -24,7 +24,7 @@ function view(state,e){
  }
  return '<section class="panel"><div class="panel-head"><div><h2>공식 법령·행정규칙·자치법규 조회</h2>'+
    '<p>국가법령정보센터 DRF API를 통한 직접 조회 · 판본 및 수집 근거 보존</p></div></div>'+
-   '<div class="privacy-note"><strong>공동활용 API 인증 필요</strong> OC 인증값을 직접 입력해야 합니다. Puter 네트워크 중계를 이용하므로 로그인 및 제3자 전송이 발생하며 OC는 작업 파일에 보관하지 않습니다.</div>'+
+   '<div class="privacy-note"><strong>공식 API 연결</strong> OC 기본값 dori를 코드에서 자동 적용합니다. Puter 네트워크 중계를 이용하므로 로그인 및 제3자 전송이 발생합니다.</div>'+
    '<form id="officialSearchForm"><div class="form-two"><label>조회 대상<select name="target">'+
    option('law','법률·시행령·시행규칙')+
    option('admrul','행정규칙 · 훈령/예규/고시/지침')+
