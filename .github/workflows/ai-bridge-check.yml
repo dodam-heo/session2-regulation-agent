@@ -1,0 +1,48 @@
+name: Session 2 · AI bridge connectivity check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/ai-bridge-check.yml'
+      - 'cloudflare/worker.js'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: Probe deployed Cloudflare Worker (no Gemini generation)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check published Worker health and secret presence
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="https://session2-regulation-ai.dodam6002.workers.dev/api/health"
+          status=$(curl -sS -m 15 --retry 2 --retry-all-errors -o health.json -w '%{http_code}' \
+            -H "Origin: https://dodam-heo.github.io" "$url")
+          echo "Worker health HTTP: $status"
+          cat health.json
+          echo
+          if [[ "$status" != "200" ]]; then
+            echo "::error::Worker health returned HTTP $status; check Cloudflare Worker URL and deployment."
+            exit 1
+          fi
+          jq -e '.ok == true and .provider == "gemini" and (.aiConnected == true)' health.json >/dev/null || {
+            echo "::error::Worker code is not deployed or GEMINI_API_KEY secret is not available."
+            exit 1
+          }
+      - name: Check Pages cross-origin preflight without using Gemini quota
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="https://session2-regulation-ai.dodam6002.workers.dev/api/assist"
+          curl -sS -m 15 -D headers.txt -o /dev/null -X OPTIONS \
+            -H "Origin: https://dodam-heo.github.io" \
+            -H "Access-Control-Request-Method: POST" \
+            -H "Access-Control-Request-Headers: content-type" "$url"
+          cat headers.txt
+          grep -qi '^HTTP/.* 204' headers.txt || { echo "::error::Worker OPTIONS preflight failed."; exit 1; }
+          grep -qi '^Access-Control-Allow-Origin: https://dodam-heo.github.io' headers.txt || { echo "::error::Worker CORS is incorrect."; exit 1; }
