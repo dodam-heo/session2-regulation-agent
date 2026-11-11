@@ -71,13 +71,24 @@ function urlFor(endpoint,params){
  return u.toString();
 }
 async function request(url){
- const response=await fetch(url,{method:'GET',mode:'cors',credentials:'omit',
-   headers:{Accept:'application/json'},signal:AbortSignal.timeout(30000)});
+ let response;
+ for(let i=0;i<3;i++){
+   try {
+     response=await fetch(url,{method:'GET',mode:'cors',credentials:'omit',
+       headers:{Accept:'application/json'},signal:AbortSignal.timeout(20000)});
+     if(response.ok||![429,500,502,503,504].includes(response.status))break;
+     if(i===2)break;
+   }catch(err){
+     if(i===2)throw Error('공식 법령 API 연결 실패(재시도 3회): '+(err?.message||String(err)));
+   }
+   await new Promise(resolve=>setTimeout(resolve,500*(i+1)));
+ }
+ if(!response)throw Error('공식 법령 API가 응답하지 않았습니다.');
  if(!response.ok)throw Error('공식 API 응답 오류 HTTP '+response.status);
  const text=await response.text();
  if(text.length>5_000_000)throw Error('공식 원문이 5MB를 초과합니다. 공식 사이트에서 확인해 주세요.');
  let json;try{json=JSON.parse(text.replace(/^\uFEFF/,''));}
- catch{throw Error('공식 API가 JSON을 반환하지 않았습니다. OC 인증값·응답 형식을 확인해 주세요.');}
+ catch{throw Error('공식 API가 JSON을 반환하지 않았습니다. 인증값·응답 형식을 확인해 주세요.');}
  if(json?.resultCode==='01'||json?.resultCode===1||json?.error)throw Error('공식 API 요청 실패: '+(json?.resultMsg||json?.error||'인증값·조회 조건을 확인해 주세요.'));
  return json;
 }
