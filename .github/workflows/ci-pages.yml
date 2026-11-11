@@ -39,6 +39,7 @@ jobs:
         run: |
           test -s dist/index.html
           test -s dist/src/main.js
+          test -s dist/src/ai-client.js
           test -s dist/src/styles.css
           test -s dist/src/core/parser.js
           echo "Static site output verified"
