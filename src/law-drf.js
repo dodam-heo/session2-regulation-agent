@@ -25,7 +25,7 @@ function officialLink(raw){
  if(!s)return '';
  try {
    const u=new URL(s,'https://www.law.go.kr/');
-   return (u.protocol==='https:'&&(/(^|\.)law\.go\.kr$/i).test(u.hostname))?u.toString():'';
+   if(['http:','https:'].includes(u.protocol)&&(/(^|\.)law\.go\.kr$/i).test(u.hostname)){u.protocol='https:';return u.toString();}return '';
  }catch{return '';}
 }
 function normalizeList(response,target){
