@@ -1,0 +1,10 @@
+const fs=require('node:fs');
+const path=require('node:path');
+const root=path.resolve(__dirname,'..');
+const out=path.join(root,'dist');
+fs.rmSync(out,{recursive:true,force:true});
+fs.mkdirSync(out,{recursive:true});
+fs.cpSync(path.join(root,'index.html'),path.join(out,'index.html'));
+fs.cpSync(path.join(root,'src'),path.join(out,'src'),{recursive:true});
+fs.writeFileSync(path.join(out,'.nojekyll'),'');
+console.log('Static Pages bundle created:',out);
