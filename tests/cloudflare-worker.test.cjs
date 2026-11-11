@@ -56,6 +56,7 @@ test('actual provider-neutral /api/assist contract uses Gemini only on Worker',a
   const w=await worker(),original=global.fetch;
   let request;
   global.fetch=async(url,options)=>{
+    if(String(url).includes('?pageSize=1000'))return new Response(JSON.stringify({models:[{name:'models/gemini-3.8-flash',supportedGenerationMethods:['generateContent']},{name:'models/gemini-3.7-flash',supportedGenerationMethods:['generateContent']}]}),{status:200});
     request={url,options};
     return new Response(JSON.stringify({candidates:[{content:{parts:[{text:JSON.stringify({
       proposalText:'제1조(목적) 업무의 목적을 명확히 정한다.',
@@ -71,7 +72,7 @@ test('actual provider-neutral /api/assist contract uses Gemini only on Worker',a
     assert.equal(body.reason,'목적 조문 명확화');
     assert.equal(body.warnings[0],'상위법령과 정합성 검토 필요');
     assert.equal(body.provider,'gemini');
-    assert.equal(body.model,'gemini-flash-latest');
+    assert.equal(body.model,'gemini-3.8-flash');
     assert.equal(JSON.stringify(body).includes('fake-secret'),false);
     assert.match(request.url,/generativelanguage\.googleapis\.com\/v1beta\/models\//);
     assert.equal(request.options.headers['x-goog-api-key'],'fake-secret');
@@ -81,7 +82,9 @@ test('actual provider-neutral /api/assist contract uses Gemini only on Worker',a
 });
 test('Gemini quota error returns 429 and does not expose provider response',async()=>{
   const w=await worker(),old=global.fetch;
-  global.fetch=async()=>new Response('secret provider details',{status:429});
+  global.fetch=async(url)=>String(url).includes('?pageSize=1000')
+    ?new Response(JSON.stringify({models:[{name:'models/gemini-3.8-flash',supportedGenerationMethods:['generateContent']},{name:'models/gemini-3.7-flash',supportedGenerationMethods:['generateContent']}]}),{status:200})
+    :new Response('secret provider details',{status:429});
   try{
     const r=await w.fetch(make('POST','/api/assist','test-quota',payload),{GEMINI_API_KEY:'fake-secret'});
     assert.equal(r.status,429);
@@ -90,7 +93,9 @@ test('Gemini quota error returns 429 and does not expose provider response',asyn
 });
 test('isolate-local rate cap blocks repeat IP even if model succeeds',async()=>{
   const w=await worker(),old=global.fetch;
-  global.fetch=async()=>new Response(JSON.stringify({candidates:[{content:{parts:[{text:JSON.stringify({proposalText:'제1조(목적) 개정',reason:'',warnings:[]})}]}}]}),{status:200});
+  global.fetch=async(url)=>String(url).includes('?pageSize=1000')
+    ?new Response(JSON.stringify({models:[{name:'models/gemini-3.8-flash',supportedGenerationMethods:['generateContent']},{name:'models/gemini-3.7-flash',supportedGenerationMethods:['generateContent']}]}),{status:200})
+    :new Response(JSON.stringify({candidates:[{content:{parts:[{text:JSON.stringify({proposalText:'제1조(목적) 개정',reason:'',warnings:[]})}]}}]}),{status:200});
   try{
     const results=[];
     for(let i=0;i<7;i++)results.push(await w.fetch(make('POST','/api/assist','test-rate-ip',payload),{GEMINI_API_KEY:'fake-secret'}));
@@ -103,7 +108,8 @@ test('Gemini HTTP 503 falls back to a second configured model',async()=>{
   const calls=[];
   global.fetch=async(url)=>{
     calls.push(String(url));
-    if(calls.length===1)return new Response(JSON.stringify({error:{message:'overloaded'}}),{status:503});
+    if(String(url).includes('?pageSize=1000'))return new Response(JSON.stringify({models:[{name:'models/gemini-3.8-flash',supportedGenerationMethods:['generateContent']},{name:'models/gemini-3.7-flash',supportedGenerationMethods:['generateContent']}]}),{status:200});
+    if(calls.length===2)return new Response(JSON.stringify({error:{message:'overloaded'}}),{status:503});
     return new Response(JSON.stringify({candidates:[{content:{parts:[{text:JSON.stringify({
       proposalText:'제1조(목적) 규정의 목적을 명확히 정한다.',reason:'간결화',warnings:[]
     })}]}}]}),{status:200});
@@ -112,18 +118,40 @@ test('Gemini HTTP 503 falls back to a second configured model',async()=>{
     const r=await w.fetch(make('POST','/api/assist','test-model-fallback',payload),{GEMINI_API_KEY:'fake-secret'});
     assert.equal(r.status,200);
     const answer=await r.json();
-    assert.equal(answer.model,'gemini-2.5-flash');
-    assert.equal(calls.length,2);
-    assert.match(calls[1],/gemini-2\.5-flash/);
+    assert.equal(answer.model,'gemini-3.7-flash');
+    assert.equal(calls.length,3);
+    assert.match(calls[2],/gemini-3\.7-flash/);
   }finally{global.fetch=old;}
 });
 
 test('repeated Gemini HTTP 503 is accurately reported, not hidden as a generic 502',async()=>{
   const w=await worker(),old=global.fetch;
-  global.fetch=async()=>new Response('{}',{status:503});
+  global.fetch=async(url)=>String(url).includes('?pageSize=1000')
+    ?new Response(JSON.stringify({models:[{name:'models/gemini-3.8-flash',supportedGenerationMethods:['generateContent']},{name:'models/gemini-3.7-flash',supportedGenerationMethods:['generateContent']}]}),{status:200})
+    :new Response('{}',{status:503});
   try{
     const r=await w.fetch(make('POST','/api/assist','test-repeated-503',payload),{GEMINI_API_KEY:'fake-secret'});
     assert.equal(r.status,503);
     assert.match((await r.json()).error,/일시적으로|응답/);
+  }finally{global.fetch=old;}
+});
+
+test('only advertised generateContent models are used (no hard-coded 404 fallback)',async()=>{
+  const w=await worker(),old=global.fetch;
+  const attempted=[];
+  global.fetch=async(url)=>{
+    attempted.push(String(url));
+    if(String(url).includes('?pageSize=1000'))return new Response(JSON.stringify({models:[
+      {name:'models/gemini-3.5-flash-lite',supportedGenerationMethods:['generateContent']},
+      {name:'models/gemini-3.8-live',supportedGenerationMethods:['bidiGenerateContent']}
+    ]}),{status:200});
+    return new Response(JSON.stringify({candidates:[{content:{parts:[{text:JSON.stringify({proposalText:'제1조(목적) 수정',reason:'',warnings:[]})}]}}]}),{status:200});
+  };
+  try{
+    const r=await w.fetch(make('POST','/api/assist','test-live-model-selection',payload),{GEMINI_API_KEY:'fake-secret'});
+    assert.equal(r.status,200);
+    assert.equal((await r.json()).model,'gemini-3.5-flash-lite');
+    assert.match(attempted[1],/gemini-3\.5-flash-lite/);
+    assert.doesNotMatch(attempted.join(' '),/gemini-2\.5-flash/);
   }finally{global.fetch=old;}
 });
