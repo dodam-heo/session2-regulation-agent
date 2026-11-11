@@ -13,7 +13,7 @@ const MAX_BODY_BYTES=230000;
 const MAX_CLAUSE_CHARS=100000;
 const MAX_OUTPUT_CHARS=50000;
 const buckets=new Map();
-let globalHits=0,globalWindow=Date.now();
+let globalHits=0,globalWindow=0;
 
 function responseJson(data,status=200,origin=''){
   const headers={'Content-Type':'application/json; charset=utf-8',
@@ -71,7 +71,7 @@ function toPrompt(data){
 function parseProposal(text){
   if(typeof text!=='string')throw Error('Gemini 응답에 규정 전문이 없습니다.');
   let parsed;
-  try{parsed=JSON.parse(text.trim().replace(/^``(?:json)?\s*/i,'').replace(/\s*``$/,''));}
+  try{parsed=JSON.parse(text.trim());}
   catch{throw Error('Gemini가 JSON 규정 초안을 반환하지 않았습니다.');}
   if(!parsed||typeof parsed.proposalText!=='string'||!parsed.proposalText.trim()||
     parsed.proposalText.length>MAX_OUTPUT_CHARS)throw Error('Gemini 규정 초안 전문이 비었거나 너무 깁니다.');
