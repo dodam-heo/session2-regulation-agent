@@ -48,15 +48,16 @@ function extractDetails(response,target){
  const root=response?.법령||response?.행정규칙||response?.자치법규||response;
  const all=nodes(root), headings=target==='ordin'?['조내용','조문내용']:['조문내용','조내용'];
  const blocks=[],extras=[],forms=[];
- const uniq=new Set();
- function add(arr,s){s=asText(s).trim();if(s&&!uniq.has(s)){uniq.add(s);arr.push(s);}}
+ function add(arr,s){s=asText(s).trim();if(s)arr.push(s);}
  for(const obj of all){
-   for(const key of headings)if(has(obj,key))add(blocks,obj[key]);
+   const heading=headings.find(key=>has(obj,key)&&asText(obj[key]).trim());
+   if(heading)add(blocks,obj[heading]);
    for(const key of ['부칙내용'])if(has(obj,key))add(extras,obj[key]);
    for(const key of ['별표내용'])if(has(obj,key))add(forms,obj[key]);
  }
  if(!blocks.length)for(const obj of all)if(has(obj,'항내용'))add(blocks,obj['항내용']);
- const text=[...blocks, ...(extras.length?['부칙',...extras]:[]), ...forms].join('\n').slice(0,250000);
+ const text=[...blocks, ...(extras.length?['부칙',...extras]:[]), ...forms].join('\n');
+ if(text.length>250000)throw Error('공식 원문이 25만 자를 초과했습니다. 잘라서 저장하지 않고 공식 사이트 확인을 요청합니다.');
  const n=all.find(o=>FIELDS[target].name.some(k=>has(o,k)))||root;
  return {text,title:get(n,FIELDS[target].name),version:{
    serial:get(n,FIELDS[target].serial),id:get(n,FIELDS[target].id),
@@ -95,15 +96,22 @@ async function search({oc,target='law',query='',history=false,page=1}){
  if(target==='law'&&history)q.nw='1,2,3';
  else if(target!=='law')q.nw=history?'2':'1';
  const json=await request(urlFor('lawSearch.do',q));
- return {items:normalizeList(json,target),total:Number(json?.totalCnt||json?.law?.totalCnt||json?.admrul?.totalCnt||0),query:phrase,target,history};
+ const items=normalizeList(json,target).map(item=>({...item,apiTarget:q.target}));
+ return {items,total:Number(json?.totalCnt||json?.law?.totalCnt||json?.admrul?.totalCnt||0),query:phrase,target,history};
 }
 async function detail({oc,item}){
  if(!item||!item.target)throw Error('조회할 공식 규정을 먼저 선택하세요.');
  assertTarget(item.target);
  const id=String(item.serial||item.id||'');
  if(!/^\d{1,16}$/.test(id))throw Error('공식 원문 식별번호가 유효하지 않습니다.');
- const q={OC:checkOC(oc),target:item.target,type:'JSON'};
+ const apiTarget=item.target==='law'&&item.apiTarget==='eflaw'?'eflaw':item.target;
+ const q={OC:checkOC(oc),target:apiTarget,type:'JSON'};
  if(item.target==='law'||item.target==='ordin')q.MST=id;else q.ID=id;
+ if(apiTarget==='eflaw'){
+   const date=String(item.effective||'').replace(/[^0-9]/g,'');
+   if(!/^\d{8}$/.test(date))throw Error('시행일 기준 법령 원문 조회를 위한 시행일자가 없습니다. 임의로 현행 법령으로 대체하지 않습니다.');
+   q.efYd=date;
+ }
  const json=await request(urlFor('lawService.do',q));
  const data=extractDetails(json,item.target);
  if(!data.text.trim())throw Error('조회 응답에 사용할 수 있는 조문 텍스트가 없습니다. 원문과 별표를 공식 사이트에서 확인해 주세요.');
