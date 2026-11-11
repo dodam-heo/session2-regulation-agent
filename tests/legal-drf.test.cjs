@@ -58,3 +58,35 @@ test('명시적으로 빈 OC값은 요청 전 거부한다',async()=>{
  await assert.rejects(()=>x.api.search({oc:'',target:'admrul',query:'규정'}),/OC 인증값/);
  assert.equal(x.requests.length,0);
 });
+
+test('시행일 기준 법령은 eflaw 상세조회에 일련번호와 시행일을 사용한다',async()=>{
+ const listing={'법령검색':{'법령':[{'법령명한글':'가상법','법령일련번호':'123','시행일자':'20270101'}]}};
+ const list=setup(listing);
+ const item=(await list.api.search({target:'law',query:'가상법',history:true})).items[0];
+ assert.equal(item.apiTarget,'eflaw');
+ const detail=setup({'법령':{'조문':{'조문단위':[{'조문내용':'제1조(목적) 내용'}]}}});
+ await detail.api.detail({item});
+ const query=new URL(detail.requests[0]).searchParams;
+ assert.equal(query.get('target'),'eflaw');
+ assert.equal(query.get('MST'),'123');
+ assert.equal(query.get('efYd'),'20270101');
+ assert.equal(query.get('OC'),'dori');
+});
+test('시행일 없는 연혁 원문은 현행본으로 바꿔 가져오지 않는다',async()=>{
+ const x=setup({});
+ await assert.rejects(()=>x.api.detail({item:{target:'law',apiTarget:'eflaw',serial:'123'}}),/시행일자/);
+ assert.equal(x.requests.length,0);
+});
+test('서로 다른 조문에 같은 문구가 있어도 원문을 임의로 제거하지 않는다',()=>{
+ const x=setup({});
+ const result=x.api.extractDetails({'법령':{'조문':{'조문단위':[
+   {'조문내용':'제1조(목적) 공통 문구'},
+   {'조문내용':'제2조(적용) 공통 문구'},
+   {'조문내용':'제2조(적용) 공통 문구'}
+ ]}}},'law');
+ assert.equal(result.text.split('제2조(적용)').length-1,2);
+});
+test('25만 자 이상 긴 법령을 조용히 잘라 저장하지 않는다',()=>{
+ const x=setup({});
+ assert.throws(()=>x.api.extractDetails({'법령':{'조문':{'조문내용':'제1조(내용) '+ '가'.repeat(250100)}}},'law'),/잘라서 저장하지/);
+});
