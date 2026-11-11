@@ -1,6 +1,6 @@
 /* Official law.go.kr DRF integration. No fabricated law text or versions.
- * Uses Puter networking on GitHub Pages: authorization is provided by the user
- * at request time, is never persisted or embedded in the repository.
+ * The official API permits cross-origin GET (Access-Control-Allow-Origin: *).
+ * Browser uses native fetch; no third-party Puter account/SDK is needed.
  */
 (function(global){
 'use strict';
@@ -71,10 +71,8 @@ function urlFor(endpoint,params){
  return u.toString();
 }
 async function request(url){
- if(!global.RegulationAI?.ensurePuter)throw Error('공식 검색 연결 모듈을 불러오지 못했습니다. 페이지를 새로고침하세요.');
- const sdk=await global.RegulationAI.ensurePuter();
- if(typeof sdk.net?.fetch!=='function')throw Error('Puter 네트워크 기능을 사용할 수 없습니다.');
- const response=await sdk.net.fetch(url);
+ const response=await fetch(url,{method:'GET',mode:'cors',credentials:'omit',
+   headers:{Accept:'application/json'},signal:AbortSignal.timeout(30000)});
  if(!response.ok)throw Error('공식 API 응답 오류 HTTP '+response.status);
  const text=await response.text();
  if(text.length>5_000_000)throw Error('공식 원문이 5MB를 초과합니다. 공식 사이트에서 확인해 주세요.');
