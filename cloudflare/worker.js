@@ -80,8 +80,11 @@ function parseProposal(text){
     warnings:Array.isArray(parsed.warnings)?parsed.warnings.filter(x=>typeof x==='string').slice(0,20):[]};
 }
 async function generateGemini(data,env){
-  const model=String(env.LLM_MODEL||DEFAULT_MODEL).trim();
-  if(!/^[a-zA-Z0-9._-]{4,90}$/.test(model))throw Error('Worker의 Gemini 모델 설정이 올바르지 않습니다.');
+  const primary=String(env.LLM_MODEL||DEFAULT_MODEL).trim();
+  const fallback=String(env.LLM_FALLBACK_MODEL===undefined?'gemini-2.5-flash':env.LLM_FALLBACK_MODEL).trim();
+  const valid=name=>/^[a-zA-Z0-9._-]{4,90}$/.test(name);
+  if(!valid(primary)||(fallback&&!valid(fallback)))throw Error('Worker의 Gemini 모델 설정이 올바르지 않습니다.');
+  const models=[primary,...(fallback&&fallback!==primary?[fallback]:[])];
   const system=[
     '대한민국 공공부문 규정 제정·개정 초안 작성 보조자.',
     '제공되지 않은 법령 조문·위임 근거·사건이나 시행일을 만들어내지 않는다.',
@@ -90,35 +93,55 @@ async function generateGemini(data,env){
     '불확실하거나 법적 확인이 필요한 사항은 warnings에 남긴다.',
     'JSON 객체로 proposalText(전체 규정 초안),reason(변경 이유),warnings(검토 필요 사항 배열)만 반환한다.'
   ].join('\n');
-  const endpoint='https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(model)+':generateContent';
   const body={
     systemInstruction:{parts:[{text:system}]},
     contents:[{role:'user',parts:[{text:toPrompt(data)}]}],
-    generationConfig:{
-      responseMimeType:'application/json',
-      temperature:0.15,
-      maxOutputTokens:16384
-    }
+    generationConfig:{responseMimeType:'application/json',temperature:0.15,maxOutputTokens:16384}
   };
-  let upstream;
-  try{
-    upstream=await fetch(endpoint,{
-      method:'POST',
-      headers:{'Content-Type':'application/json','x-goog-api-key':env.GEMINI_API_KEY},
-      body:JSON.stringify(body),
-      signal:AbortSignal.timeout(75000)
-    });
-  }catch{throw Error('Gemini 연결에 실패했습니다. 잠시 뒤 다시 시도하세요.');}
-  if(!upstream.ok){
-    if(upstream.status===429)throw Object.assign(Error('Gemini 사용량 제한에 도달했습니다. 잠시 후 다시 시도하세요.'),{status:429});
-    if(upstream.status===400||upstream.status===404)throw Error('Gemini 요청 또는 모델 설정을 확인해야 합니다(HTTP '+upstream.status+').');
-    if(upstream.status===401||upstream.status===403)throw Error('Cloudflare에 등록된 Gemini API 키 권한을 확인하세요(HTTP '+upstream.status+').');
-    throw Error('Gemini 서버가 응답하지 않았습니다(HTTP '+upstream.status+').');
+  let lastError;
+  for(let i=0;i<models.length;i++){
+    const model=models[i];
+    const endpoint='https://generativelanguage.googleapis.com/v1beta/models/'+encodeURIComponent(model)+':generateContent';
+    let upstream;
+    try{
+      upstream=await fetch(endpoint,{
+        method:'POST',
+        headers:{'Content-Type':'application/json','x-goog-api-key':env.GEMINI_API_KEY},
+        body:JSON.stringify(body),
+        signal:AbortSignal.timeout(i===0&&models.length>1?35000:45000)
+      });
+    }catch{
+      lastError=Object.assign(Error('Gemini 응답이 지연되거나 연결이 중단되었습니다. 모델을 다시 시도해 주세요.'),{status:503});
+      if(i+1<models.length){await new Promise(r=>setTimeout(r,1000));continue;}
+      throw lastError;
+    }
+    if(!upstream.ok){
+      const status=upstream.status;
+      const retryable=[404,500,502,503,504].includes(status);
+      if(status===429)lastError=Object.assign(Error('Gemini 사용량 또는 할당량 제한입니다(HTTP 429). AI Studio의 Rate limits를 확인하세요.'),{status:429});
+      else if(status===401||status===403)lastError=Object.assign(Error('Cloudflare의 Gemini API 키 권한을 확인하세요(HTTP '+status+').'),{status:status});
+      else if(status===400)lastError=Object.assign(Error('Gemini 요청 형식이 지원되지 않습니다(HTTP 400).'),{status:502});
+      else if(status===404)lastError=Object.assign(Error('Gemini 모델 '+model+'을 찾을 수 없습니다(HTTP 404).'),{status:502});
+      else if(retryable)lastError=Object.assign(Error('Gemini 서버가 일시적으로 응답하지 않습니다(HTTP '+status+').'),{status:503});
+      else lastError=Object.assign(Error('Gemini 서비스 오류(HTTP '+status+').'),{status:502});
+      if(retryable&&i+1<models.length){await new Promise(r=>setTimeout(r,1000));continue;}
+      throw lastError;
+    }
+    const json=await upstream.json().catch(()=>null);
+    const output=json?.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('');
+    if(!output){
+      lastError=Object.assign(Error('Gemini가 규정 초안 텍스트를 반환하지 않았습니다.'),{status:502});
+      if(i+1<models.length)continue;
+      throw lastError;
+    }
+    try{return {...parseProposal(output),provider:'gemini',model};}
+    catch(err){
+      lastError=Object.assign(err,{status:502});
+      if(i+1<models.length)continue;
+      throw lastError;
+    }
   }
-  const json=await upstream.json().catch(()=>null);
-  const output=json?.candidates?.[0]?.content?.parts?.map(p=>p.text||'').join('');
-  if(!output)throw Error('Gemini가 텍스트를 반환하지 않았습니다. 모델 설정 또는 응답 제한을 확인하세요.');
-  return {...parseProposal(output),provider:'gemini',model};
+  throw lastError||Object.assign(Error('Gemini 호출에 실패했습니다.'),{status:503});
 }
 export default {
   async fetch(request,env){

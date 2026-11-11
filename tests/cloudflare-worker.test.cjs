@@ -97,3 +97,33 @@ test('isolate-local rate cap blocks repeat IP even if model succeeds',async()=>{
     assert.deepEqual(results.map(x=>x.status),[200,200,200,200,200,200,429]);
   }finally{global.fetch=old;}
 });
+
+test('Gemini HTTP 503 falls back to a second configured model',async()=>{
+  const w=await worker(),old=global.fetch;
+  const calls=[];
+  global.fetch=async(url)=>{
+    calls.push(String(url));
+    if(calls.length===1)return new Response(JSON.stringify({error:{message:'overloaded'}}),{status:503});
+    return new Response(JSON.stringify({candidates:[{content:{parts:[{text:JSON.stringify({
+      proposalText:'제1조(목적) 규정의 목적을 명확히 정한다.',reason:'간결화',warnings:[]
+    })}]}}]}),{status:200});
+  };
+  try{
+    const r=await w.fetch(make('POST','/api/assist','test-model-fallback',payload),{GEMINI_API_KEY:'fake-secret'});
+    assert.equal(r.status,200);
+    const answer=await r.json();
+    assert.equal(answer.model,'gemini-2.5-flash');
+    assert.equal(calls.length,2);
+    assert.match(calls[1],/gemini-2\.5-flash/);
+  }finally{global.fetch=old;}
+});
+
+test('repeated Gemini HTTP 503 is accurately reported, not hidden as a generic 502',async()=>{
+  const w=await worker(),old=global.fetch;
+  global.fetch=async()=>new Response('{}',{status:503});
+  try{
+    const r=await w.fetch(make('POST','/api/assist','test-repeated-503',payload),{GEMINI_API_KEY:'fake-secret'});
+    assert.equal(r.status,503);
+    assert.match((await r.json()).error,/일시적으로|응답/);
+  }finally{global.fetch=old;}
+});

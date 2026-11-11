@@ -50,3 +50,9 @@ GitHub Pages는 `POST /api/assist`의 `{proposalText,reason,warnings,provider,mo
 ## 현재 가능한 테스트의 범위
 
 `npm test`는 Worker의 Gemini API 통신을 **가짜 HTTP 응답**으로 검증합니다. 실제 API 키가 이 저장소에 없으므로 자동 테스트는 실제 Gemini를 호출하지 않습니다. 위 Cloudflare Worker 소스를 사람이 **Edit code → Deploy**한 후에만 실제 엔드포인트가 사용됩니다.
+
+## Gemini HTTP 503 발생 시 복구
+
+실서비스에서 Gemini가 HTTP 503을 반환하는 사례가 확인되었습니다. 서버의 기본 모델(`LLM_MODEL`, 기본 `gemini-flash-latest`) 호출이 HTTP 503·5xx 또는 시간 초과로 실패하면, 이제 대체 모델(`LLM_FALLBACK_MODEL`, 기본 `gemini-2.5-flash`)을 한 번 시도합니다. 브라우저에 모델 API 키를 노출하지 않으며, 최종 결과에는 실제 사용한 모델을 표시합니다. 429 할당량 초과와 401/403 인증 오류는 자동 재시도하지 않습니다.
+
+**중요:** GitHub에 `cloudflare/worker.js`를 커밋하는 것으로 운영 중인 Cloudflare Worker가 변경되지는 않습니다. Cloudflare 대시보드에서 **Workers & Pages → session2-regulation-ai → Edit code → 전체 코드 교체 → Deploy**를 직접 수행해야 합니다. Secret `GEMINI_API_KEY`는 수정하거나 코드에 복사하지 않습니다. 배포 후 `/api/health`는 설정·키 존재만 표시하며 실제 Gemini 생성의 성공 여부까지 보장하지 않습니다.
