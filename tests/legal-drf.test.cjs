@@ -48,7 +48,12 @@ test('공식 원문의 조문·부칙·별표와 원문 해시를 보존한다',
  assert.equal(r.hash.length,64);
  assert.equal(r.verifiedFromApi,true);
 });
-test('공식 API 인증값 없이는 검색 요청 자체를 보내지 않는다',async()=>{
+test('기본 OC=dori를 명시하지 않아도 공식 검색에 적용한다',async()=>{
+ const x=setup({'법령검색':{'법령':[]}});
+ await x.api.search({target:'law',query:'가상법'});
+ assert.match(x.requests[0],/OC=dori/);
+});
+test('명시적으로 빈 OC값은 요청 전 거부한다',async()=>{
  const x=setup({});
  await assert.rejects(()=>x.api.search({oc:'',target:'admrul',query:'규정'}),/OC 인증값/);
  assert.equal(x.requests.length,0);
