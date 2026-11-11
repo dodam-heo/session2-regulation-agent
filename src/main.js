@@ -1,7 +1,7 @@
 const e=escapeHtml;
 
 let cases=loadCases();let activeId=null,tab='overview',modal=null,filter='all',aiWorking=false,aiMessage='';
-let aiServerUrl='';
+let aiServerUrl='https://session2-regulation-ai.dodam6002.workers.dev';
 let lawOc='dori',lawSearch={items:[],query:'',target:'law',loading:false,error:'',selected:null};
 const root=document.querySelector('#app');
 const tabs=[['overview','업무 개요'],['sources','근거·자료'],['draft','조문 편집'],['compare','신구 대비'],['review','오류·영향'],['documents','문서·절차']];
@@ -50,16 +50,14 @@ function decisionsPanel(work){
 }
 function overviewView(work){const counts=compareRegulations(work.baseText,work.draftText),num=counts.filter(x=>x.status!=='유지').length;const review=work.review?.version===work.draftVersion?work.review:null;return `<div class="grid-overview"><section class="panel wide">${sectionTop('작업 현황','한 번 등록한 자료와 초안을 모든 기능에서 공유합니다.')}<div class="stats"><div><b>${work.sources.length}</b><span>등록 근거</span></div><div><b>${work.draftVersion}</b><span>초안 버전</span></div><div><b>${num}</b><span>변경 조문</span></div><div><b>${review?review.items.length:'—'}</b><span>최근 점검 항목</span></div></div><div class="summary-grid"><div class="summary-block"><span class="minor-label">업무 목적</span><form id="objectiveForm"><textarea name="objective" rows="3" placeholder="이번 제·개정의 목적">${e(work.objective)}</textarea><button class="btn btn-minor" type="submit">내용 저장</button></form></div><div class="summary-block"><span class="minor-label">지금 할 수 있는 작업</span><div class="next-actions"><button data-action="tab" data-tab="sources">근거와 판본 등록 <span>→</span></button><button data-action="tab" data-tab="draft">조문 초안 편집 <span>→</span></button><button data-action="tab" data-tab="review">인용·정합성 확인 <span>→</span></button><button data-action="tab" data-tab="documents">문서 세트 내보내기 <span>→</span></button></div></div></div></section><section class="panel ai-panel">${sectionTop('AI 초안 작성 보조','Gemini 우선 사용 · 다른 LLM으로 전환 가능한 독립형 AI 서버 연동')}<div class="privacy-note"><strong>원문은 자동 전송되지 않습니다.</strong> AI 요청 버튼을 누르고 전송 동의한 경우에만 연결된 서버로 전달됩니다.</div><form id="aiForm">
 <div class="summary-block">
-<strong>Gemini AI 서버 연결</strong>
-<p class="muted">Gemini API는 서버의 비밀 환경변수에서 호출합니다. 이 페이지에 API 키를 입력하거나 저장하지 않습니다. 서버 설정만 변경하면 OpenAI 호환·Anthropic 모델로 전환할 수 있습니다.</p>
-<label>AI 서버 주소
-<input name="aiServerUrl" value="${e(aiServerUrl)}" placeholder="https://설치된-AI-서버-주소" autocomplete="url" />
-</label>
-<label>AI 서버 접근 토큰 (서버가 요구하는 경우)
-<input type="password" autocomplete="off" name="aiServerToken" placeholder="입력값은 저장하지 않습니다" value="" />
-</label>
+<strong>Gemini AI · Cloudflare Worker 연동</strong>
+<p class="muted">AI API 키 입력 불필요. Gemini 키는 Cloudflare Worker의 비공개 Secret에 보관되며, 이 페이지에서 조회할 수 없습니다. AI 제안은 직접 승인하기 전 초안에 적용되지 않습니다.</p>
+<details class="ai-advanced"><summary>고급 설정 · AI 서버 주소 변경</summary>
+<label>AI 서버 주소<input name="aiServerUrl" value="${e(aiServerUrl)}" placeholder="https://서버-주소" autocomplete="url" /></label>
+<label>접근 토큰 (다른 보안 서버 연결 시에만)<input type="password" name="aiServerToken" placeholder="기본 Cloudflare Worker는 입력할 필요 없음" autocomplete="off" value="" /></label>
+</details>
 <button type="button" class="btn btn-minor" data-action="check-ai-connection">AI 서버 연결 확인</button>
-<p class="hint">GitHub Pages에는 AI 서버가 포함되지 않습니다. 별도 서버를 연결해야 Gemini를 사용할 수 있습니다. 공식 법령 검색은 AI 서버 없이 작동합니다.</p>
+<p class="hint">Cloudflare Worker에 Gemini 중계 코드를 배포하면 바로 사용할 수 있습니다. 공식 법령 검색은 AI 서버 없이 작동합니다. 여러 방문자의 AI 사용량은 운영자가 관리합니다.</p>
 </div>
 <label>요청 내용<textarea name="instruction" rows="4" placeholder="예: 제3조의 문구를 명확하게 수정하고 근거가 부족한 부분은 별도로 표시해줘">${e(work.objective)}</textarea></label><label class="consent"><input type="checkbox" name="consent" required /> 현재 작업 원문을 구성된 AI 서버로 전송하는 데 동의합니다.</label><button class="btn btn-primary full" ${aiWorking?'disabled':''} type="submit">${aiWorking?'AI 제안 생성 중…':'AI 초안 제안 요청 →'}</button></form><div class="hint">AI 제안은 검증 전 초안으로, 담당자가 승인하기 전에는 규정 본문에 반영되지 않습니다.</div>${aiMessage?`<div class="message">${e(aiMessage)}</div>`:''}${work.aiSuggestion?`<div class="proposal"><strong>AI 제안 · 적용 전 검토</strong><pre>${e(work.aiSuggestion.proposalText||'내용 없음')}</pre>${work.aiSuggestion.reason?`<p>${e(work.aiSuggestion.reason)}</p>`:''}${work.aiSuggestion.warnings?.length?'<div class="notice amber-notice"><strong>AI 검토 필요 사항</strong><ul>'+work.aiSuggestion.warnings.map(x=>'<li>'+e(x)+'</li>').join('')+'</ul></div>':''}<div class="button-row"><button class="btn btn-primary" data-action="apply-ai">이 제안으로 초안 교체</button><button class="btn btn-minor" data-action="reject-ai">제안 닫기</button></div></div>`:''}</section>${revisionPanel(work)}<section class="panel activity-panel">${sectionTop('최근 변경 이력','초안 변경 시 비교·검토는 최신 자료에서 다시 계산합니다.')}<div class="activity-list">${[...work.history].reverse().slice(0,9).map(x=>`<div><span class="history-dot"></span><span><strong>${e(x.what)}</strong><small>${formatDate(x.at)}</small></span></div>`).join('')}</div></section></div>`;}
 function safeExternalUrl(raw){
