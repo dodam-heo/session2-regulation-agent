@@ -3,7 +3,7 @@ const http=require('node:http');
 const {timingSafeEqual}=require('node:crypto');
 const fs=require('node:fs/promises');
 const path=require('node:path');
-const {generateProposal,isConfigured}=require('./providers.js');
+const {generateProposal,isConfigured,config}=require('./providers.js');
 const root=path.resolve(__dirname,'..');
 const port=Number(process.env.PORT||3000);
 const host=process.env.HOST||'127.0.0.1';
@@ -39,7 +39,7 @@ async function handler(req,res){
       if(!allowOrigin(req,res))return json(res,403,{error:'허용되지 않은 브라우저 출처입니다.'});
       if(req.method==='OPTIONS'){res.writeHead(204);res.end();return;}
     }
-    if(req.url==='/api/health')return json(res,200,{ok:true,aiConnected:isConfigured(),sourceSearchConnected:false});
+    if(req.url==='/api/health'){const c=config();return json(res,200,{ok:true,aiConnected:isConfigured(),provider:c.provider,model:c.model});}
     if(req.url?.startsWith('/api/assist')){
       if(req.method!=='POST')return json(res,405,{error:'POST 요청만 지원합니다.'});
       if(!authorized(req))return json(res,401,{error:'AI 서버 접근 토큰이 유효하지 않습니다.'});
