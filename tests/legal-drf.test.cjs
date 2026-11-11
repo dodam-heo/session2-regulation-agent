@@ -5,7 +5,7 @@ const src=fs.readFileSync(path.resolve(__dirname,'../src/law-drf.js'),'utf8');
 function setup(data){
  const requests=[];
  const sdk={net:{fetch:async url=>{requests.push(url);return {ok:true,text:async()=>JSON.stringify(data)};}}};
- const ctx={window:{RegulationAI:{ensurePuter:async()=>sdk}},URL,TextEncoder,Date,crypto:require('node:crypto').webcrypto};
+ const ctx={window:{},fetch:sdk.net.fetch,AbortSignal,URL,TextEncoder,Date,crypto:require('node:crypto').webcrypto};
  vm.runInNewContext(src,ctx,{filename:'law-drf.js'});
  return {api:ctx.window.LawDRF,requests};
 }
