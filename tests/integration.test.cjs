@@ -14,9 +14,7 @@ function run(expression){
 }
 test('사용자 입력 → 조문 수정 → 신구비교 → 검토 → 결과물 연결',()=>{
   const result=run(String.raw`(()=>{
-    const original="제1조(목적) 지원업무
-제2조(신청) ① 신청기한은 30일이다.
-제3조(통지) ① 결과통지는 30일 이내에 한다.";
+    const original="제1조(목적) 지원업무\n제2조(신청) ① 신청기한은 30일이다.\n제3조(통지) ① 결과통지는 30일 이내에 한다.";
     const w=newCase("amend",{title:"테스트규정",baseText:original,draftText:original});
     const target=parseRegulation(w.draftText).find(x=>x.label==="제2조");
     const changed=replaceBlock(w.draftText,target.key,"제2조(신청) ① 신청기한은 20일이다.");
