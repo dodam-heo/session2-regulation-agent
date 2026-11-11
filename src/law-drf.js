@@ -4,7 +4,7 @@
  */
 (function(global){
 'use strict';
-const TARGETS=['law','admrul','ordin'],BASE='https://www.law.go.kr/DRF/';
+const TARGETS=['law','admrul','ordin'],BASE='https://www.law.go.kr/DRF/',DEFAULT_OC='dori';
 const FIELDS={
  law:{key:['법령일련번호','법령ID'],name:['법령명한글','법령명_한글'],serial:['법령일련번호'],id:['법령ID'],issued:['공포일자'],effective:['시행일자'],kind:['법령구분명'],issuer:['소관부처명'],link:['법령상세링크']},
  admrul:{key:['행정규칙일련번호','행정규칙ID'],name:['행정규칙명'],serial:['행정규칙일련번호'],id:['행정규칙ID'],issued:['발령일자'],effective:['시행일자'],kind:['행정규칙종류'],issuer:['소관부처명'],link:['행정규칙상세링크']},
@@ -83,7 +83,7 @@ async function request(url){
  return json;
 }
 function checkOC(oc){
- const s=String(oc||'').trim();
+ const s=String(oc===undefined||oc===null?DEFAULT_OC:oc).trim();
  if(!/^[A-Za-z0-9@._-]{2,160}$/.test(s))throw Error('공식 법령 API의 OC 인증값을 입력해 주세요.');
  return s;
 }
