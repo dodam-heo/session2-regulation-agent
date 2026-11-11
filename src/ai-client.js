@@ -60,10 +60,10 @@
    u.pathname=stem.endsWith('/api/assist')?stem:stem+'/api/assist';
    return u.toString();
  }
- async function generateServer(payload,endpoint){
+ async function generateServer(payload,endpoint,token=''){
    validate(payload);
    const url=makeAssistUrl(endpoint);
-   const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),credentials:'omit',signal:AbortSignal.timeout(90000)});
+   const res=await fetch(url,{method:'POST',headers:token?{'Content-Type':'application/json',Authorization:'Bearer '+token}:{'Content-Type':'application/json'},body:JSON.stringify(payload),credentials:'omit',signal:AbortSignal.timeout(90000)});
    const body=await res.json().catch(()=>({error:'서버가 JSON을 반환하지 않았습니다.'}));
    if(!res.ok)throw new Error(body.error||'AI 서버 오류 HTTP '+res.status);
    if(!body.proposalText)throw new Error('AI 서버의 초안 전문이 비어 있습니다.');
