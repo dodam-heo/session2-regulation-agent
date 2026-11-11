@@ -58,6 +58,7 @@ function overviewView(work){const counts=compareRegulations(work.baseText,work.d
 <label>AI 서버 접근 토큰 (서버가 요구하는 경우)
 <input type="password" autocomplete="off" name="aiServerToken" placeholder="입력값은 저장하지 않습니다" value="" />
 </label>
+<button type="button" class="btn btn-minor" data-action="check-ai-connection">AI 서버 연결 확인</button>
 <p class="hint">GitHub Pages에는 AI 서버가 포함되지 않습니다. 별도 서버를 연결해야 Gemini를 사용할 수 있습니다. 공식 법령 검색은 AI 서버 없이 작동합니다.</p>
 </div>
 <label>요청 내용<textarea name="instruction" rows="4" placeholder="예: 제3조의 문구를 명확하게 수정하고 근거가 부족한 부분은 별도로 표시해줘">${e(work.objective)}</textarea></label><label class="consent"><input type="checkbox" name="consent" required /> 현재 작업 원문을 구성된 AI 서버로 전송하는 데 동의합니다.</label><button class="btn btn-primary full" ${aiWorking?'disabled':''} type="submit">${aiWorking?'AI 제안 생성 중…':'AI 초안 제안 요청 →'}</button></form><div class="hint">AI 제안은 검증 전 초안으로, 담당자가 승인하기 전에는 규정 본문에 반영되지 않습니다.</div>${aiMessage?`<div class="message">${e(aiMessage)}</div>`:''}${work.aiSuggestion?`<div class="proposal"><strong>AI 제안 · 적용 전 검토</strong><pre>${e(work.aiSuggestion.proposalText||'내용 없음')}</pre>${work.aiSuggestion.reason?`<p>${e(work.aiSuggestion.reason)}</p>`:''}${work.aiSuggestion.warnings?.length?'<div class="notice amber-notice"><strong>AI 검토 필요 사항</strong><ul>'+work.aiSuggestion.warnings.map(x=>'<li>'+e(x)+'</li>').join('')+'</ul></div>':''}<div class="button-row"><button class="btn btn-primary" data-action="apply-ai">이 제안으로 초안 교체</button><button class="btn btn-minor" data-action="reject-ai">제안 닫기</button></div></div>`:''}</section>${revisionPanel(work)}<section class="panel activity-panel">${sectionTop('최근 변경 이력','초안 변경 시 비교·검토는 최신 자료에서 다시 계산합니다.')}<div class="activity-list">${[...work.history].reverse().slice(0,9).map(x=>`<div><span class="history-dot"></span><span><strong>${e(x.what)}</strong><small>${formatDate(x.at)}</small></span></div>`).join('')}</div></section></div>`;}
@@ -100,6 +101,22 @@ root.addEventListener('click',async event=>{
   if(act==='open-case'){activeId=b.dataset.id;tab='overview';render();return;}
   if(act==='tab'){toTab(b.dataset.tab);return;}
   const work=w();if(!work)return;
+  if(act==='check-ai-connection'){
+    const address=document.querySelector('#aiForm [name="aiServerUrl"]')?.value?.trim()||'';
+    aiServerUrl=address;
+    try{
+      if(!globalThis.RegulationAI)throw Error('AI 연결 모듈이 없습니다.');
+      const health=new URL('./health',RegulationAI.makeAssistUrl(aiServerUrl)).toString();
+      const response=await fetch(health,{method:'GET',credentials:'omit',signal:AbortSignal.timeout(12000)});
+      if(!response.ok)throw Error('HTTP '+response.status);
+      const info=await response.json();
+      if(!info.ok)throw Error('AI 서버 상태 응답이 올바르지 않습니다.');
+      aiMessage=info.aiConnected
+        ?'AI 서버 설정 연결됨: '+String(info.provider||'unknown')+' / '+String(info.model||'미지정')+' (실제 모델 응답 검사는 별도)'
+        :'AI 서버 연결됨. 다만 Gemini API 키 또는 모델 설정이 없어 생성은 사용할 수 없습니다.';
+    }catch(err){aiMessage='AI 서버 연결 확인 실패: '+(err?.message||'서버 주소·CORS를 확인하세요.');}
+    render();return;
+  }
   if(act==='select-article'){setWork({...work,selectedKey:b.dataset.key});return;}
   if(act==='jump-article'){const match=parseRegulation(work.draftText).find(x=>norm(x.label)===norm(b.dataset.label));tab='draft';setWork({...work,selectedKey:match?.key||''});return;}
   if(act==='add-article'){const n=nextArtNumber(work.draftText),text=appendArticle(work.draftText,`제${n}조(신설 조문)`,'① 내용을 작성하세요.');const next=updateDraft(work,text,`제${n}조 신설`);next.selectedKey=parseRegulation(text).find(a=>a.kind==='article'&&a.label===`제${n}조`)?.key||'';setWork(next);notify('신설 조문이 추가되었습니다.');return;}
