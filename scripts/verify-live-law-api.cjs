@@ -11,7 +11,11 @@ const timeout=30000;
 async function request(endpoint,params) {
   const url=new URL(endpoint,API);
   for(const [k,v] of Object.entries(params))url.searchParams.set(k,v);
-  const response=await fetch(url,{signal:AbortSignal.timeout(timeout),headers:{Accept:'application/json'}});
+  let response;
+  for(let attempt=1;attempt<=3;attempt++){
+    try{response=await fetch(url,{signal:AbortSignal.timeout(timeout),headers:{Accept:'application/json'}});break;}
+    catch(e){if(attempt===3)throw e;await new Promise(ok=>setTimeout(ok,1000*attempt));}
+  }
   const raw=await response.text();
   const contentType=response.headers.get('content-type')||'';
   const cors=response.headers.get('access-control-allow-origin')||'(absent)';
